@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<Strategies>
+	<strategy class="StrategyA" switch="on" so="./strategyA.so" />
+	<strategy class="StrategyB" switch="on" so="./strategyB.so" />
+</Strategies>
