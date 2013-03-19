@@ -13,6 +13,8 @@
 #define DEFAULT_REDIS_SERVER_IP "localhost"
 #define DEFAULT_REDIS_PORT 6379
 #define MAX_REDIS_CONTENT_LEN 102400
+#define DEFAULT_CONN_TIMEOUT 5
+#define DEFAULT_RDWR_TIMEOUT 5
 
 typedef unsigned long long uint64;
 typedef unsigned int uint32;
@@ -26,16 +28,27 @@ typedef enum
 	CONNECT_ERROR	= -2 ,
 }ENUM_REDIS_ERROR;
 
+//struct timeval {
+//	time_t         tv_sec;        /* seconds */
+//	suseconds_t    tv_usec;  /* microseconds */
+//};
+
 struct RedisConf
 {
 	RedisConf()
 	{
 		port=0;
-        ip[0] = '\0';
+		ip[0] = '\0';
+		conn_timeout.tv_sec = 5;
+		conn_timeout.tv_usec = 0;
+		rdwr_timeout.tv_sec = 5;
+		rdwr_timeout.tv_usec = 0;
 	}
-	
+
 	int port;
 	char ip[MAX_STRLEN];
+	struct timeval conn_timeout;
+	struct timeval rdwr_timeout;
 };
 #pragma pack()
 

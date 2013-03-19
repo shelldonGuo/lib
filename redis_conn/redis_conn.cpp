@@ -19,12 +19,18 @@ int RedisConn::initConn(RedisConf &redis_conf)
 	_pconf = &redis_conf;
 	if ( NULL == _pconf  || '\0' == _pconf->ip[0] || 0 == _pconf->port)
 		return FAIL;
-	_conn = redisConnect(_pconf->ip, _pconf->port); //redis server默认端口
+	_conn = redisConnectWithTimeout(_pconf->ip, _pconf->port, _pconf->conn_timeout); //redis server默认端口
 	if(_conn->err){
-		printf("connection error: %s", _conn->errstr);
+		printf("connection error: %s\n", _conn->errstr);
 		return CONNECT_ERROR;
 	}
-	
+
+	if(redisSetTimeout(_conn, _pconf->rdwr_timeout))
+	{
+		printf("redis set time error\n");
+		return CONNECT_ERROR;
+	}
+
     return OK;
 }
 
@@ -78,9 +84,15 @@ int RedisConn::reconnect()
 	if ( NULL == _pconf  || '\0' == _pconf->ip[0] || 0 == _pconf->port)
 		return FAIL;
 
-	_conn = redisConnect(_pconf->ip, _pconf->port); //redis server默认端口
+	_conn = redisConnectWithTimeout(_pconf->ip, _pconf->port, _pconf->conn_timeout); //redis server默认端口
 	if(_conn->err){
-		printf("connection error: %s", _conn->errstr);
+		printf("connection error: %s\n", _conn->errstr);
+		return CONNECT_ERROR;
+	}
+
+	if(redisSetTimeout(_conn, _pconf->rdwr_timeout))
+	{
+		printf("redis set time error\n");
 		return CONNECT_ERROR;
 	}
 	
@@ -128,6 +140,29 @@ int redis_load_conf()
 		redis_conf.redis_conf.port = DEFAULT_REDIS_PORT;
 		ul_writelog(UL_LOG_NOTICE, "Conf: redis port is: %d DEFAULT", DEFAULT_REDIS_PORT);
 	}
+
+	if (ul_getconfint(pconf, "conn_timeout",(int *)&( redis_conf.redis_conf.conn_timeout.tv_sec))) 
+	{
+		ul_writelog(UL_LOG_NOTICE, "Conf: redis conn_timeout: %d", redis_conf.redis_conf.conn_timeout.tv_sec);
+	}
+	else 
+	{
+		redis_conf.redis_conf.port = DEFAULT_CONN_TIMEOUT;
+		ul_writelog(UL_LOG_NOTICE, "Conf: redis conn_timeout is: %d DEFAULT", DEFAULT_CONN_TIMEOUT);
+	}
+
+	if (ul_getconfint(pconf, "rdwr_timeout",(int *)&( redis_conf.redis_conf.rdwr_timeout.tv_sec))) 
+	{
+		ul_writelog(UL_LOG_NOTICE, "Conf: redis rdwr_timeout: %d", redis_conf.redis_conf.rdwr_timeout.tv_sec);
+	}
+	else 
+	{
+		redis_conf.redis_conf.port = DEFAULT_RDWR_TIMEOUT;
+		ul_writelog(UL_LOG_NOTICE, "Conf: redis rdwr_timeout is: %d DEFAULT", DEFAULT_RDWR_TIMEOUT);
+	}
+
+
+
 
 	ul_freeconf(pconf);
 	pconf=NULL;
