@@ -6,7 +6,9 @@
 RedisConn redis_conn;
 Redis_Conf_t redis_conf;
 
-RedisConn::RedisConn() : _conn(NULL)
+const int RedisConn::m_retry = 2;
+
+RedisConn::RedisConn() : m_conn(NULL)
 {
 }
 
@@ -14,61 +16,66 @@ RedisConn::~RedisConn()
 {
 }
 
+int RedisConn::loadConf(RedisConf &redis_conf)
+{
+	m_pconf = &redis_conf;
+	if ( NULL == m_pconf  || '\0' == m_pconf->ip[0] || 0 == m_pconf->port)
+		return FAIL;
+	return OK;
+}
+
 int RedisConn::initConn(RedisConf &redis_conf)
 {
-	_pconf = &redis_conf;
-	if ( NULL == _pconf  || '\0' == _pconf->ip[0] || 0 == _pconf->port)
+	if(loadConf(redis_conf) != OK)
 		return FAIL;
-	_conn = redisConnectWithTimeout(_pconf->ip, _pconf->port, _pconf->conn_timeout); //redis server默认端口
-	if(_conn->err){
-		printf("connection error: %s\n", _conn->errstr);
-		return CONNECT_ERROR;
-	}
+	if(reconnect() != OK)
+		return FAIL;
 
-	if(redisSetTimeout(_conn, _pconf->rdwr_timeout))
-	{
-		printf("redis set time error\n");
-		return CONNECT_ERROR;
-	}
-
-    return OK;
+	return OK;
 }
 
 void RedisConn::finiConn()
 {
-	redisFree(_conn);
-	_conn = NULL;
+	if (m_conn != NULL)
+	{
+		redisFree(m_conn);
+		m_conn = NULL;
+	}
 }
 
 redisContext* RedisConn::getRedis()
 {
-    return _conn;
+    return m_conn;
 }
 
 int RedisConn::execCmd(const char* stmt, RedisResult *result)
 {
-	redisContext* conn = getRedis();
-	if (NULL == conn)
+	int retry = m_retry;
+	redisReply *reply;
+
+	while(retry > 0)
 	{
-		return FAIL;
+		if (NULL == m_conn)
+		{
+			if(reconnect() != OK)
+			{
+				retry--;
+				continue;
+			}
+		}
+
+		reply = (redisReply *) redisCommand(m_conn, stmt);
+		if(NULL == reply)
+		{
+			finiConn();
+			continue;
+		}
+		break;
 	}
 
-	redisReply *reply = (redisReply *) redisCommand(conn, stmt);
-	if(NULL == reply)
+	if (retry <= 0)
 	{
-		if(reconnect() == OK)
-		{
-			conn = getRedis();
-			reply = (redisReply *) redisCommand(conn, stmt);
-			if (NULL == reply)
-			{
-				return FAIL;
-			}
-		}		
-		else
-		{
-			return CONNECT_ERROR;
-		}
+		return FAIL;
 	}
 
 	if (NULL != result )
@@ -79,20 +86,27 @@ int RedisConn::execCmd(const char* stmt, RedisResult *result)
 
 int RedisConn::reconnect()
 {
-	finiConn();
-
-	if ( NULL == _pconf  || '\0' == _pconf->ip[0] || 0 == _pconf->port)
+	if ( NULL == m_pconf  || '\0' == m_pconf->ip[0] || 0 == m_pconf->port)
 		return FAIL;
 
-	_conn = redisConnectWithTimeout(_pconf->ip, _pconf->port, _pconf->conn_timeout); //redis server默认端口
-	if(_conn->err){
-		printf("connection error: %s\n", _conn->errstr);
+	finiConn();
+
+	m_conn = redisConnectWithTimeout(m_pconf->ip, m_pconf->port, m_pconf->conn_timeout); //redis server默认端口
+	if ( NULL == m_conn )
+	{
+		printf("connection init error: conn==NULL\n");
+		return CONNECT_ERROR;
+	}
+	if(m_conn->err){
+		printf("connection error: %s\n", m_conn->errstr);
+		finiConn();
 		return CONNECT_ERROR;
 	}
 
-	if(redisSetTimeout(_conn, _pconf->rdwr_timeout))
+	if(redisSetTimeout(m_conn, m_pconf->rdwr_timeout))
 	{
 		printf("redis set time error\n");
+		finiConn();
 		return CONNECT_ERROR;
 	}
 	
@@ -147,7 +161,7 @@ int redis_load_conf()
 	}
 	else 
 	{
-		redis_conf.redis_conf.port = DEFAULT_CONN_TIMEOUT;
+		redis_conf.redis_conf.conn_timeout.tv_sec = DEFAULT_CONN_TIMEOUT;
 		ul_writelog(UL_LOG_NOTICE, "Conf: redis conn_timeout is: %d DEFAULT", DEFAULT_CONN_TIMEOUT);
 	}
 
@@ -157,7 +171,7 @@ int redis_load_conf()
 	}
 	else 
 	{
-		redis_conf.redis_conf.port = DEFAULT_RDWR_TIMEOUT;
+		redis_conf.redis_conf.rdwr_timeout.tv_sec = DEFAULT_RDWR_TIMEOUT;
 		ul_writelog(UL_LOG_NOTICE, "Conf: redis rdwr_timeout is: %d DEFAULT", DEFAULT_RDWR_TIMEOUT);
 	}
 

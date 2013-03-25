@@ -111,8 +111,11 @@ public:
 	int execCmd(const char* stmt, RedisResult *result);
 private:
 	int reconnect();
-	RedisConf *_pconf;    
-	redisContext* _conn;
+	int loadConf(RedisConf &redis_conf);
+
+	RedisConf *m_pconf;    
+	redisContext* m_conn;
+	static const int m_retry;
 
 };
 
