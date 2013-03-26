@@ -67,6 +67,7 @@ int RedisConn::execCmd(const char* stmt, RedisResult *result)
 		reply = (redisReply *) redisCommand(m_conn, stmt);
 		if(NULL == reply)
 		{
+			retry--;  //重试减一，如果没有则造成死循环
 			finiConn();
 			continue;
 		}
@@ -94,11 +95,11 @@ int RedisConn::reconnect()
 	m_conn = redisConnectWithTimeout(m_pconf->ip, m_pconf->port, m_pconf->conn_timeout); //redis server默认端口
 	if ( NULL == m_conn )
 	{
-		printf("connection init error: conn==NULL\n");
+		printf("redis connection init error: conn==NULL\n");
 		return CONNECT_ERROR;
 	}
 	if(m_conn->err){
-		printf("connection error: %s\n", m_conn->errstr);
+		printf("redis connection error: %s\n", m_conn->errstr);
 		finiConn();
 		return CONNECT_ERROR;
 	}
