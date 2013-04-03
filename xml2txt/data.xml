@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doc>
+	<item>
+		<fromurl>http://abc.html</fromurl>
+		<objurl>http://abc.jpg</objurl>
+		<query>abc$$bc</query>
+		<tab>1</tab>
+	</item>
+	<item>
+		<fromurl>http://xyz.html</fromurl>
+		<objurl>http://xmy.jpg</objurl>
+		<query>x$$y</query>
+		<tab>1</tab>
+	</item>
+</doc>
